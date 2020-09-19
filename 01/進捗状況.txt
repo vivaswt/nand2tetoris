@@ -1,0 +1,16 @@
+進捗状況
+And         〇
+And16       〇
+DMux        〇
+DMux4Way    〇
+DMux8Way    〇
+Mux         〇
+Mux4Way     〇
+Mux8Way     〇
+Mux16       〇
+Not         〇
+Not16       〇
+Or          〇
+Or8Way      〇
+Or16        〇
+Xor         〇
