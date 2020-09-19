@@ -1,5 +1,5 @@
-HalfAdder
-FullAdder
-Add16
+HalfAdder   〇
+FullAdder   〇
+Add16       〇
 Inc16
 ALU
