@@ -1,0 +1,11 @@
+CHIP MyTest {
+    IN  
+        x[16];
+    OUT 
+        out[16],
+        zx;
+    PARTS:
+        And16(a=x, b=true, out=out);
+        And16(a=x, b=true, out[0]=wout);
+        Or(a=x[2], b=wout, out=zx);
+}
