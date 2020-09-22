@@ -1,0 +1,8 @@
+Bit         〇
+Register    〇
+RAM8        〇
+RAM64       〇
+RAM512      〇
+RAM4K       〇
+RAM16K      〇
+PC

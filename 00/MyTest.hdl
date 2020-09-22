@@ -1,11 +1,13 @@
 CHIP MyTest {
     IN  
-        x[16];
+        a,
+        b;
     OUT 
-        out[16],
-        zx;
+        c,
+        d;
     PARTS:
-        And16(a=x, b=true, out=out);
-        And16(a=x, b=true, out[0]=wout);
-        Or(a=x[2], b=wout, out=zx);
+        Or(a=a, b=outb, out=wa);
+        Or(a=outa, b=b, out=wb);
+        Not(in=wa, out=outa);
+        Not(in=wb, out=outb);
 }
