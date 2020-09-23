@@ -16,15 +16,19 @@ CHIP PC {
     OUT out[16];
 
     PARTS:
-    // zx nx zy ny f  no out
-    // 1  0  1  0  1  0  0(reset)
-    // 0  0  1  1  0  0  x(load)
-    // 1  1  0  1  1  1  y+1(=oldout+1)
-    // 1  1  0  0  0  0  y(=oldout)
-    Mux16(a=oldout, b=in, sel=load, out=w1);
-    Mux16(a=w1, b=false, sel=reset, out=w2);
-    Inc16(in=oldout, out=incoldout);
-    Mux16(a=w2, b=incoldout, sel=inc, out=w3);
+    Not(in=reset, out=notreset);
+    And(a=notreset, b=load, out=wload);
+    Not(in=load, out=notload);
+    And(a=notreset, b=notload, out=wf1);
+    And(a=wf1, b=inc, out=winc);
 
-    Register(in=w3, load=load, out=out, out=oldout);
+    Mux16(a=old, b=false, sel=reset, out=v1);
+    Mux16(a=v1, b=in, sel=wload, out=v2);
+    Inc16(in=v2, out=v2inc);
+    Mux16(a=v2, b=v2inc, sel=winc, out=v3);
+
+    Or(a=load, b=reset, out=f1);
+    Or(a=f1, b=inc, out=f2);
+
+    Register(in=v3, load=f2, out=old, out=out);
 }

@@ -5,4 +5,4 @@ RAM64       〇
 RAM512      〇
 RAM4K       〇
 RAM16K      〇
-PC
+PC          〇
