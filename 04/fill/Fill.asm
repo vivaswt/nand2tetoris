@@ -37,11 +37,11 @@
 
 (DRAW_LOOP)
     // calcuate address in screen.
-    // position = SCREEN + i
+    // position = address of SCREEN + i
     @SCREEN
-    D=M
+    D=A
     @i
-    D=D+A
+    D=D+M
     @position
     M=D
 
@@ -52,14 +52,14 @@
     M=D
 
     // i = i + 1
-    // if (i > 8192) goto LOOP
+    // if (i >= 8192) goto LOOP
     @i
     M=M+1
     D=M
     @8192
     D=D-A
     @LOOP
-    D;JGT
+    D;JGE
 
     @DRWA_LOOP
     0;JMP
