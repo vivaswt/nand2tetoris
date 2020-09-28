@@ -49,6 +49,7 @@
     @flag
     D=M
     @position
+    A=M
     M=D
 
     // i = i + 1
@@ -61,5 +62,5 @@
     @LOOP
     D;JGE
 
-    @DRWA_LOOP
+    @DRAW_LOOP
     0;JMP
