@@ -39,5 +39,56 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    // control bits
+    // c1: Mux load for A
+    // A命令の時
+    Not(in=instruction[15], out=cntMuxA);
+
+    // c2: load for A
+    // A命令の時　または　C命令かつd1=1
+    Not(in=instruction[15], out=wc21);
+    And(a=instruction[15], b=instruction[5], out=wc22);
+    Or(a=wc21, b=wc22, out=cntLoadA);
+
+    // c3: load for D
+    // C命令　かつ d2=1
+    And(a=instruction[15], b=instruction[4], out=cntLoadD);
+
+    // c4: Mux select for A/M
+    // C命令　かつ　a=1
+    And(a=instruction[15], b=instruction[12], out=cntMuxAM);
+
+    // c5: load for PC
+    // C命令　かつ　j1・ng+j2・zr+j3・not zr・not ng
+    And(a=instruction[2], b=ng, out=wc51);
+    And(a=instruction[1], b=zr, out=wc52);
+    Not(in=zr, out=wc53);
+    Not(in=ng, out=wc54);
+    And(a=instruction[0], b=wc53, out=wc55);
+    And(a=wc55, b=wc54, out=wc56);
+    Or(a=wc51, b=wc52, out=wc57);
+    Or(a=wc57, b=wc56, out=wc58);
+    And(a=instruction[15], b=wc58, out=cntLoadPC);
+
+    // c6: ALU flags
+    // なし
+
+    // c7: writeM
+    // C命令　かつ　d3=1
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // パーツ結合
+    Mux16(a=outALU, b=instruction, sel=cntMuxA, out=outMuxA);
+    Register(in=outMuxA, load=cntLoadA, out=outA, out=addressM);
+    Register(in=outALU, load=cntLoadD, out=outD);
+    Mux(a=outA, b=inM, sel=cntMuxAM, out=outAM);
+    PC(in=outA, load=cntLoadPC, inc=true, reset=reset, out=pc);
+    ALU(x=outD, y=outAM, 
+        zx=instruction[11],
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+        out=outALU, zr=zr, ng=ng);
 }
