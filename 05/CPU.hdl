@@ -79,10 +79,10 @@ CHIP CPU {
 
     // パーツ結合
     Mux16(a=outALU, b=instruction, sel=cntMuxA, out=outMuxA);
-    Register(in=outMuxA, load=cntLoadA, out=outA, out=addressM);
-    Register(in=outALU, load=cntLoadD, out=outD);
-    Mux(a=outA, b=inM, sel=cntMuxAM, out=outAM);
-    PC(in=outA, load=cntLoadPC, inc=true, reset=reset, out=pc);
+    ARegister(in=outMuxA, load=cntLoadA, out=outA, out[0..14]=addressM);
+    DRegister(in=outALU, load=cntLoadD, out=outD);
+    Mux16(a=outA, b=inM, sel=cntMuxAM, out=outAM);
+    PC(in=outA, load=cntLoadPC, inc=true, reset=reset, out[0..14]=pc);
     ALU(x=outD, y=outAM, 
         zx=instruction[11],
         nx=instruction[10],
@@ -90,5 +90,7 @@ CHIP CPU {
         ny=instruction[8],
         f=instruction[7],
         no=instruction[6],
-        out=outALU, zr=zr, ng=ng);
+        out=outALU, 
+        out=outM,
+        zr=zr, ng=ng);
 }
