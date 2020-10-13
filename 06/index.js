@@ -1,4 +1,5 @@
 'use strict';
+const { debug } = require('console');
 const fs = require('fs');
 const {Transform} = require('stream');
 
@@ -22,6 +23,7 @@ class LineSplitter extends Transform {
 
     _final(callback) {
         this.push(this.rest);
+        callback();
     }
 }
 
@@ -89,18 +91,31 @@ class Parser extends Transform {
 }
 
 class Code extends Transform {
-    constructor(options) {
+    constructor(symbolTable, options) {
         const _options = options || {};
         _options.readableObjectMode = true;
         _options.writableObjectMode = true;
         super(_options);
+
+        this.symbolTable = symbolTable;
+        this.nextRAMAddress = 16;
+    }
+
+    valueOfSymbol(symbol) {
+        if (this.symbolTable.has(symbol)) {
+            return this.symbolTable.get(symbol);
+        }
+        this.symbolTable.set(symbol, this.nextRAMAddress);
+        return this.nextRAMAddress++;
     }
 
     _transform(chunk, encoding, callback) {
         let code = '';
         switch (chunk.type) {
             case 'A':
-                code = chunk.value.toString(2).padStart(16, '0');
+                const value = chunk.isSymbol ? 
+                    this.valueOfSymbol(chunk.symbol) : chunk.value;
+                code = value.toString(2).padStart(16, '0');
                 this.push(code);
                 break;
             case 'C':
@@ -272,11 +287,59 @@ class Formatter extends Transform {
     }
 }
 
-const stream = fs.createReadStream(process.argv[2], {highWaterMark: 10});
+function parseLabelSymbols(resolve, reject) {
+    const stream = fs.createReadStream(process.argv[2]);
+    const pstream =
+        stream
+            .pipe(new LineSplitter())
+            .pipe(new Parser());
 
-stream
-    .pipe(new LineSplitter())
-    .pipe(new Parser())
-    .pipe(new Code())
-    .pipe(new Formatter())
-    .pipe(process.stdout);
+    let address = 0;
+    const table = new Map();
+ 
+    pstream.on('end', () => {
+        resolve(table);
+    });
+
+    pstream.on('data', (chunk) => {
+        switch (chunk.type) {
+            case 'A':
+            case 'C':
+                address++;
+                break;
+            case 'L':
+                table.set(chunk.symbol, address);
+                break;
+            default:
+                break;
+        }
+    });
+}
+
+function addDefinedSymbols(table) {
+    table.set('SP', 0);
+    table.set('LCL', 1);
+    table.set('ARG', 2);
+    table.set('THIS', 3);
+    table.set('THAT', 4);
+    table.set('SCREEN', 16384);
+    table.set('KBD', 24576);
+    for(let i = 0; i < 16; i++) {
+        table.set(`R${i}`, i);
+    }
+    return table;
+}
+
+const promise = new Promise(parseLabelSymbols);
+promise.then(table => {
+    return addDefinedSymbols(table);
+}).then(table => {
+    const stream = fs.createReadStream(process.argv[2]);
+
+    stream
+        .pipe(new LineSplitter())
+        .pipe(new Parser())
+        .pipe(new Code(table))
+        .pipe(new Formatter())
+        .pipe(process.stdout);
+});
