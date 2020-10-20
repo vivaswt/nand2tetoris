@@ -1,0 +1,4 @@
+push constant 55
+pop static 123
+add
+and
