@@ -1,4 +1,3 @@
-push constant 55
-pop static 123
-add
-and
+push constant 26
+push constant 25
+eq
