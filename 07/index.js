@@ -129,21 +129,22 @@ class Translator extends Transform {
     translateArithmetic(command) {
         switch (command.arg1) {
             case 'add':
-                return this.translateAdd(command);
             case 'sub':
-                return this.translateSub(command);
+                return this.translateBinaryOperation(command);
             case 'neg':
                 return this.translateNeg(command);
             case 'eq':
-                return this.translateEq(command);
+            case 'gt':
+            case 'lt':
+                return this.translateComparisonOperation(command);
             default:
                 break;
         }
     }
 
-    translateAdd(command) {
+    translateBinaryOperation(command) {
         const result = [];
-        result.push(`// ** add **`);
+        result.push(`// ** ${command.arg1} **`);
 
         result.push(`@SP`);
         result.push(`M=M-1`)
@@ -152,23 +153,16 @@ class Translator extends Transform {
         result.push(`@SP`);
         result.push(`M=M-1`)
         result.push(`A=M`);
-        result.push(`M=D+M`)
-        result.push(`@SP`);
-        result.push(`M=M+1`);
-        return result;
-    }
-
-    translateSub(command) {
-        const result = [];
-        result.push(`// ** sub **`);
-        result.push(`@SP`);
-        result.push(`M=M-1`)
-        result.push(`A=M`);
-        result.push(`D=M`);
-        result.push(`@SP`);
-        result.push(`M=M-1`)
-        result.push(`A=M`);
-        result.push(`M=M-D`)
+        switch (command.arg1) {
+            case 'add':
+                result.push(`M=D+M`);
+                break;
+            case 'sub':
+                result.push(`M=D-M`);
+            default:
+                break;
+        }
+        
         result.push(`@SP`);
         result.push(`M=M+1`);
         return result;
@@ -184,10 +178,10 @@ class Translator extends Transform {
         return result;
     }
 
-    translateEq(command) {
+    translateComparisonOperation(command) {
         const result = [];
 
-        result.push(`// ** eq **`);
+        result.push(`// ** ${command.arg1} **`);
         result.push(`// @SP = @SP - 1`);
         result.push(`@SP`);
         result.push(`M=M-1`)
@@ -206,16 +200,28 @@ class Translator extends Transform {
         result.push(`// substract 2 values`);
         result.push(`D=M-D`);
         result.push(`@COMP${this.labelNumber++}`);
-        result.push(`D;JEQ`);
-
-        result.push(`// case a != b`);
+        switch (command.arg1) {
+            case 'eq':
+                result.push(`D;JEQ`);
+                break;
+            case 'gt':
+                result.push(`D;JGT`);
+                break;
+            case 'lt':
+                result.push(`D;JLT`);
+                break;
+            default:
+                break;
+        }
+        
+        result.push(`// case : condition is not true`);
         result.push(`@SP`);
         result.push(`A=M`);
         result.push(`M=0`);
         result.push(`@COMP${this.labelNumber++}`);
         result.push(`0;JMP`);
 
-        result.push(`// case a == b`);
+        result.push(`// case : condition is true`);
         result.push(`(COMP${this.labelNumber - 2})`);
         result.push(`D=-1`);
         result.push(`@SP`);
