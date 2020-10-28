@@ -130,9 +130,12 @@ class Translator extends Transform {
         switch (command.arg1) {
             case 'add':
             case 'sub':
+            case 'and':
+            case 'or':
                 return this.translateBinaryOperation(command);
             case 'neg':
-                return this.translateNeg(command);
+            case 'not':
+                return this.translateUnaryOperation(command);
             case 'eq':
             case 'gt':
             case 'lt':
@@ -159,6 +162,13 @@ class Translator extends Transform {
                 break;
             case 'sub':
                 result.push(`M=D-M`);
+                break;
+            case 'and':
+                result.push(`M=D&M`);
+                break;
+            case 'or':
+                result.push(`M=D|M`);
+                break;
             default:
                 break;
         }
@@ -168,13 +178,21 @@ class Translator extends Transform {
         return result;
     }
 
-    translateNeg(command) {
+    translateUnaryOperation(command) {
         const result = [];
-        result.push(`// ** neg **`);
+        result.push(`// ** ${command.arg1} **`);
         result.push(`@SP`);
         result.push(`A=M`);
         result.push(`A=A-1`);
-        result.push(`M=-M`);
+        switch (command.arg1) {
+            case 'neg':
+                result.push(`M=-M`);
+                break;
+            case 'not':
+                result.push(`M=!M`);
+            default:
+                break;
+        }
         return result;
     }
 

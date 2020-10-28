@@ -1,3 +1,4 @@
-push constant 25
-push constant 26
-lt
+push constant 53
+neg
+push constant 28
+not
