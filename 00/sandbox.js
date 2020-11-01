@@ -1,40 +1,31 @@
 'use strict';
 
-const fs = require('fs');
-const {Transform} = require('stream');
-
-class LineSplitter extends Transform {
-    constructor(options) {
-        const _options = options || {};
-        _options.readableObjectMode = true;
-        super(_options);
-        this.rest = '';
-    }
-
-    _transform(chunk, encoding, callback) {
-        const chunkstr = this.rest + chunk.toString();
-        const lines = chunkstr.split('\r\n');
-        for(let i = 0; i < lines.length - 1; i++) {
-            this.push(lines[i]);
-        }
-        this.rest = lines[lines.length - 1];
-        callback();
-    }
-
-    _final(callback) {
-        this.push(this.rest);
-        callback();
-    }
+function testcall(value) {
+    console.log(`begin ${value}`);
+    return new Promise(resolve => {
+        setTimeout(() => {
+            console.log(`process ${value}`);
+            resolve(value);
+        }, 50);
+    });
 }
 
-const stream = fs.createReadStream('file.txt');
-const splitter = new LineSplitter();
+function testcall3(value) {
+    console.log(`start ${value}`);
+    return new Promise(resolve => {
+        console.log(`process ${value}`);
+        resolve(value);
+    });
+}
 
-splitter.on('end', () => {
-    console.log('end');
-});
-splitter.on('data', chunk => {
-    console.log(chunk);
+const call = [testcall(1), testcall(2), testcall(3)];
+
+return;
+console.log('start');
+testcall(1).then(value => {
+    return testcall(value + 1);
+}).then(value => {
+    return testcall(value + 1);
 });
 
-stream.pipe(splitter);
+console.log('end');

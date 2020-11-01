@@ -294,7 +294,6 @@ if (!fs.existsSync(process.argv[2])) {
     console.error('file does not exists.');
     exit(1);
 }
-console.log(asmFileName(process.argv[2]));
 
 function asmFileName(inputName) {
     const _inputName = path.resolve(inputName);
@@ -307,6 +306,16 @@ function asmFileName(inputName) {
             path.basename(_inputName, '.vm') + '.asm');
     }
     return outputFileName;
+}
+
+function vmFiles(inputName) {
+    if (fs.statSync(inputName).isDirectory()) {
+        return fs.readdirSync(inputName, {withFileTypes: true})
+            .filter(d => d.isFile() && path.extname(d.name) === '.vm')
+            .map(d => d.name);
+    } else {
+        return [inputName];
+    }
 }
 
 function translateFile(inFileName) {
