@@ -1,6 +1,8 @@
 'use strict';
 const fs = require('fs');
+const { resolve } = require('path');
 const path = require('path');
+const { exit } = require('process');
 const {Transform} = require('stream');
 
 class LineSplitter extends Transform {
@@ -288,15 +290,42 @@ class Formatter extends Transform {
     }
 }
 
-const stream = fs.createReadStream(process.argv[2]);
-const out = fs.createWriteStream(
-    path.basename(
-        process.argv[2], 
-        path.extname(process.argv[2])) + '.asm');
+if (!fs.existsSync(process.argv[2])) {
+    console.error('file does not exists.');
+    exit(1);
+}
+console.log(asmFileName(process.argv[2]));
 
-stream
-    .pipe(new LineSplitter())
-    .pipe(new Parser())
-    .pipe(new Translator())
-    .pipe(new Formatter())
-    .pipe(out);
+function asmFileName(inputName) {
+    const _inputName = path.resolve(inputName);
+    let outputFileName = '';
+    if (fs.statSync(_inputName).isDirectory()) {
+        outputFileName = path.join(_inputName, path.basename(_inputName) + '.asm');
+    } else {
+        outputFileName = path.join(
+            path.dirname(_inputName),
+            path.basename(_inputName, '.vm') + '.asm');
+    }
+    return outputFileName;
+}
+
+function translateFile(inFileName) {
+    return new Promise(resolve => {
+        const stream = fs.createReadStream(inFileName);
+        const out = fs.createWriteStream(
+            path.basename(
+                inFileName,
+                path.extname(inFileName) + '.asm'));
+
+        out.on('close', () => {
+            resolve();
+        });
+
+        stream
+            .pipe(new LineSplitter())
+            .pipe(new Parser())
+            .pipe(new Translator())
+            .pipe(new Formatter())
+            .pipe(out);
+    });
+}
