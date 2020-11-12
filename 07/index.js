@@ -1,9 +1,8 @@
 'use strict';
 const fs = require('fs');
-const { resolve } = require('path');
 const path = require('path');
 const { exit } = require('process');
-const {Transform} = require('stream');
+const { Transform } = require('stream');
 
 class LineSplitter extends Transform {
     constructor(options) {
@@ -16,7 +15,7 @@ class LineSplitter extends Transform {
     _transform(chunk, encoding, callback) {
         const chunkstr = this.rest + chunk.toString();
         const lines = chunkstr.split('\r\n');
-        for(let i = 0; i < lines.length - 1; i++) {
+        for (let i = 0; i < lines.length - 1; i++) {
             this.push(lines[i]);
         }
         this.rest = lines[lines.length - 1];
@@ -69,7 +68,7 @@ class Parser extends Transform {
                 result.type = 'ARITHMETIC';
                 result.arg1 = words[0];
                 break;
-        
+
             case 'push':
                 result.type = 'PUSH';
                 result.arg1 = words[1];
@@ -160,21 +159,21 @@ class Translator extends Transform {
         result.push(`A=M`);
         switch (command.arg1) {
             case 'add':
-                result.push(`M=D+M`);
+                result.push(`M=M+D`);
                 break;
             case 'sub':
-                result.push(`M=D-M`);
+                result.push(`M=M-D`);
                 break;
             case 'and':
-                result.push(`M=D&M`);
+                result.push(`M=M&D`);
                 break;
             case 'or':
-                result.push(`M=D|M`);
+                result.push(`M=M|D`);
                 break;
             default:
                 break;
         }
-        
+
         result.push(`@SP`);
         result.push(`M=M+1`);
         return result;
@@ -216,7 +215,7 @@ class Translator extends Transform {
 
         result.push(`// A = *@SP`);
         result.push(`A=M`);
-        
+
         result.push(`// substract 2 values`);
         result.push(`D=M-D`);
         result.push(`@COMP${this.labelNumber++}`);
@@ -233,7 +232,7 @@ class Translator extends Transform {
             default:
                 break;
         }
-        
+
         result.push(`// case : condition is not true`);
         result.push(`@SP`);
         result.push(`A=M`);
@@ -290,11 +289,6 @@ class Formatter extends Transform {
     }
 }
 
-if (!fs.existsSync(process.argv[2])) {
-    console.error('file does not exists.');
-    exit(1);
-}
-
 function asmFileName(inputName) {
     const _inputName = path.resolve(inputName);
     let outputFileName = '';
@@ -310,31 +304,53 @@ function asmFileName(inputName) {
 
 function vmFiles(inputName) {
     if (fs.statSync(inputName).isDirectory()) {
-        return fs.readdirSync(inputName, {withFileTypes: true})
+        return fs.readdirSync(inputName, { withFileTypes: true })
             .filter(d => d.isFile() && path.extname(d.name) === '.vm')
-            .map(d => d.name);
+            .map(d => d.name)
+            .sort()
+            .map(f => path.join(inputName, f));
     } else {
         return [inputName];
     }
 }
 
-function translateFile(inFileName) {
+function translateFile(inFileName, outStream) {
     return new Promise(resolve => {
         const stream = fs.createReadStream(inFileName);
-        const out = fs.createWriteStream(
-            path.basename(
-                inFileName,
-                path.extname(inFileName) + '.asm'));
 
-        out.on('close', () => {
+        const formatter = new Formatter();
+        formatter.on('finish', () => {
+            stream.destroy();
             resolve();
         });
-
         stream
             .pipe(new LineSplitter())
             .pipe(new Parser())
             .pipe(new Translator())
-            .pipe(new Formatter())
-            .pipe(out);
+            .pipe(formatter)
+            .pipe(out, {end: false});
     });
 }
+
+async function translateFiles(inFileNames, out) {
+    for (const inFileName of inFileNames) {
+        await translateFile(inFileName, out);
+    }
+    return true;
+}
+
+if (!fs.existsSync(process.argv[2])) {
+    console.error('file does not exists.');
+    exit(1);
+}
+
+const out = fs.createWriteStream(
+    asmFileName(process.argv[2]));
+const inFiles = vmFiles(process.argv[2]);
+
+translateFiles(inFiles, out)
+.then(() => {
+    out.end();
+}).catch(e => {
+    console.error(e);
+});

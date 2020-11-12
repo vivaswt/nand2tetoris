@@ -1,0 +1,56 @@
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+
+<script type="text/javascript">
+    let value = 1;
+    function testData() {
+        document.getElementById("text").innerHTML = `${++value}回`;
+    }
+
+    function longProcess() {
+        const startTime = Date.now();
+        document.getElementById("text2").innerHTML = `処理中${startTime}`;
+        const p = new Promise(resolve => {
+            while (Date.now() - startTime < 5000) {
+
+            }
+            resolve();
+        });
+        p.then(() => {
+            document.getElementById("text2").innerHTML = `終了${Date.now()}`;
+        });
+
+    }
+
+    function longProcess2() {
+        const startTime = Date.now();
+        document.getElementById("text2").innerHTML = `処理中${startTime}`;
+        while (Date.now() - startTime < 5000) {
+
+        }
+        document.getElementById("text2").innerHTML = `終了${Date.now()}`;
+    }
+</script>
+
+<title>JavaScript テスト</title>
+</head>
+
+<body>
+
+    <div id="text-button">
+        <p id="text">クリック</p>
+        <p id="text2">処理</p>
+    </div>
+    <p>
+    <form name="test">
+        <input type="button" name="yahoo" value="test" onClick="testData()">
+        <input type="button" value="長時間処理" onClick="longProcess()">
+    </form>
+    </p>
+
+</body>
+
+</html>

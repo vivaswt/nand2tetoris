@@ -1,31 +1,49 @@
 'use strict';
 
-function testcall(value) {
-    console.log(`begin ${value}`);
+const fs = require('fs');
+const path = require('path');
+const { exit } = require('process');
+const { Transform } = require('stream');
+
+class Formatter extends Transform {
+    constructor(options) {
+        const _options = options || {};
+        _options.writableObjectMode = true;
+        super(_options);
+    }
+
+    _transform(chunk, encoding, callback) {
+        this.push(`${chunk}\r\n`);
+        callback();
+    }
+}
+
+function translateFile(inFileName, outStream) {
     return new Promise(resolve => {
-        setTimeout(() => {
-            console.log(`process ${value}`);
-            resolve(value);
-        }, 50);
+        const stream = fs.createReadStream(inFileName);
+
+        const formatter = new Formatter();
+        formatter.on('finish', () => {
+            stream.destroy();
+            resolve();
+        });
+        stream
+            .pipe(out, {end: false});
     });
 }
 
-function testcall3(value) {
-    console.log(`start ${value}`);
-    return new Promise(resolve => {
-        console.log(`process ${value}`);
-        resolve(value);
-    });
+async function translateFiles(inFileNames, out) {
+    for (const inFileName of inFileNames) {
+        await translateFile(inFileName, out);
+    }
+    return true;
 }
 
-const call = [testcall(1), testcall(2), testcall(3)];
+const out = fs.createWriteStream('data.txt');
 
-return;
-console.log('start');
-testcall(1).then(value => {
-    return testcall(value + 1);
-}).then(value => {
-    return testcall(value + 1);
+translateFiles(['input.txt'], out)
+.then(() => {
+    out.end();
+}).catch(e => {
+    console.error(e);
 });
-
-console.log('end');

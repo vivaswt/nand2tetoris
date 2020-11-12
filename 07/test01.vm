@@ -1,4 +1,11 @@
+push constant 57
+push constant 31
 push constant 53
+add
+push constant 112
+sub
 neg
-push constant 28
+and
+push constant 82
+or
 not
