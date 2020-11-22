@@ -1,0 +1,6 @@
+push constant 15
+push constant 18
+pop static 3
+pop static 4
+push static 3
+pop static 5

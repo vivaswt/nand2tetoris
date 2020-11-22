@@ -104,27 +104,163 @@ class Parser extends Transform {
 }
 
 class Translator extends Transform {
-    constructor(options) {
+    static #segMap1 = new Map();    // For local, argument, this, that
+    static #segMap2 = new Map();    // For pointer, temp
+
+    constructor(inFileName, options) {
         const _options = options || {};
         _options.readableObjectMode = true;
         _options.writableObjectMode = true;
         super(_options);
 
+        this.inFileName = inFileName;
+        this.inFileBaseName = path.basename(inFileName, '.vm');
         this.labelNumber = 1;
     }
 
+    static segMap1() {
+        if (this.#segMap1.size === 0) {
+            this.#segMap1.set('local', 'LCL');
+            this.#segMap1.set('argument', 'ARG');
+            this.#segMap1.set('this', 'THIS');
+            this.#segMap1.set('that', 'THAT');
+        }
+        return this.#segMap1;
+    }
+
+    static segMap2() {
+        if (this.#segMap2.size === 0) {
+            this.#segMap2.set('pointer', '3');
+            this.#segMap2.set('temp', '5');
+        }
+        return this.#segMap2;
+    }
+
     translatePUSH(command) {
-        if (command.arg1 !== 'constant') [];
         const result = [];
-        result.push(`// ** push constant ${command.arg2} **`);
-        result.push(`@${command.arg2}`);
-        result.push(`D=A`);
-        result.push(`@SP`);
-        result.push(`A=M`);
-        result.push(`M=D`);
-        result.push(`@SP`);
-        result.push(`M=M+1`);
+
+        if (command.arg1 === 'constant') {
+            result.push(`// ** push constant ${command.arg2} **`);
+            result.push(`@${command.arg2}`);
+            result.push(`D=A`);
+            result.push(`@SP`);
+            result.push(`A=M`);
+            result.push(`M=D`);
+            result.push(`@SP`);
+            result.push(`M=M+1`);
+        }
+
+        if (Translator.segMap1().has(command.arg1)) {
+            result.push(`// ** push ${command.arg1} ${command.arg2} **`);
+            result.push(`@${Translator.segMap1().get(command.arg1)}`);
+            result.push(`D=M`);
+            result.push(`@${command.arg2}`);
+            result.push(`A=D+A`);
+            result.push(`D=M`);
+
+            // ここからDの値をスタックに積む
+            result.push(`@SP`);
+            result.push(`A=M`);
+            result.push(`M=D`);
+            result.push(`@SP`);
+            result.push(`M=M+1`);
+        }
+
+        if (Translator.segMap2().has(command.arg1)) {
+            const address = 
+                parseInt(Translator.segMap2().get(command.arg1))
+                + parseInt(command.arg2);
+
+            result.push(`// ** push ${command.arg1} ${command.arg2} **`);
+            result.push(`@${address}`);
+            result.push(`D=M`);
+
+            // ここからDの値をスタックに積む
+            result.push(`@SP`);
+            result.push(`A=M`);
+            result.push(`M=D`);
+            result.push(`@SP`);
+            result.push(`M=M+1`);
+        }
+
+        if (command.arg1 === 'static') {
+            result.push(`// ** push ${command.arg1} ${command.arg2} **`);
+            // D←M[変数名]
+            result.push(`@${this.inFileBaseName}.${command.arg2}`);
+            result.push(`D=M`);
+            // M[SP]←D
+            result.push(`@SP`);
+            result.push(`A=M`);
+            result.push(`M=D`);
+            // SP←SP+1
+            result.push(`@SP`);
+            result.push(`M=M+1`);
+        }
+
         return result;
+    }
+
+    translatePOP(command) {
+        const result = [];
+
+        if (Translator.segMap1().has(command.arg1)) {
+            const segBaseName = Translator.segMap1().get(command.arg1);
+
+            result.push(`// ** pop ${command.arg1} ${command.arg2} **`);
+            // SP←SP-1
+            result.push(`@SP`);
+            result.push(`M=M-1`);
+            // base←base+α
+            result.push(`@${command.arg2}`);
+            result.push(`D=A`);
+            result.push(`@${segBaseName}`);
+            result.push(`M=D+M`);
+            // D←M[SP]
+            result.push(`@SP`);
+            result.push(`A=M`);
+            result.push(`D=M`);
+            // M[base]←D
+            result.push(`@${segBaseName}`);
+            result.push(`A=M`);
+            result.push(`M=D`);
+            //base←base-α
+            result.push(`@${command.arg2}`);
+            result.push(`D=A`);
+            result.push(`@${segBaseName}`);
+            result.push(`M=M-D`);
+        }
+
+        if (Translator.segMap2().has(command.arg1)) {
+            const address = 
+                parseInt(Translator.segMap2().get(command.arg1))
+                + parseInt(command.arg2);
+
+            result.push(`// ** pop ${command.arg1} ${command.arg2} **`);
+            // SP←SP-1
+            result.push(`@SP`);
+            result.push(`M=M-1`);
+            // D←M[SP]
+            result.push(`A=M`);
+            result.push(`D=M`);
+            // M[address]←D
+            result.push(`@${address}`);
+            result.push(`M=D`);
+        }
+
+        if (command.arg1 === 'static') {
+            result.push(`// ** pop ${command.arg1} ${command.arg2} **`);
+            // SP←SP-1
+            result.push(`@SP`);
+            result.push(`M=M-1`);
+            // D←M[SP]
+            result.push(`A=M`);
+            result.push(`D=M`);
+            // M[変数名]←D
+            result.push(`@${this.inFileBaseName}.${command.arg2}`);
+            result.push(`M=D`);
+        }
+
+        return result;  
     }
 
     translateArithmetic(command) {
@@ -266,6 +402,9 @@ class Translator extends Transform {
             case 'PUSH':
                 this.pushResults(this.translatePUSH(chunk));
                 break;
+            case 'POP':
+                this.pushResults(this.translatePOP(chunk));
+                break;
             case 'ARITHMETIC':
                 this.pushResults(this.translateArithmetic(chunk));
                 break;
@@ -326,9 +465,9 @@ function translateFile(inFileName, outStream) {
         stream
             .pipe(new LineSplitter())
             .pipe(new Parser())
-            .pipe(new Translator())
+            .pipe(new Translator(inFileName))
             .pipe(formatter)
-            .pipe(out, {end: false});
+            .pipe(out, { end: false });
     });
 }
 
@@ -349,8 +488,8 @@ const out = fs.createWriteStream(
 const inFiles = vmFiles(process.argv[2]);
 
 translateFiles(inFiles, out)
-.then(() => {
-    out.end();
-}).catch(e => {
-    console.error(e);
-});
+    .then(() => {
+        out.end();
+    }).catch(e => {
+        console.error(e);
+    });

@@ -1,0 +1,8 @@
+push constant 21
+push constant 22
+push constant 23
+pop pointer 1
+pop temp 1
+pop temp 2
+push pointer 1
+pop temp 3
