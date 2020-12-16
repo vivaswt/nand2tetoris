@@ -462,6 +462,123 @@ class Translator extends Transform {
         return result;
     }
 
+    translateCall(command) {
+        const result = [];
+
+        const pushRegister = registerName => {
+            result.push(`// * push ${registerName} *`);
+
+            // D←@registerName
+            result.push(`@${registerName}`);
+            result.push(`D=M`);
+            // M[SP]←D
+            result.push(`@SP`);
+            result.push(`A=M`);
+            result.push(`M=D`);
+            // SP++
+            result.push(`@SP`);
+            result.push(`M=M+1`);
+        };
+
+        const returnAddress = `$ret.${command.arg1}`;
+        result.push(`// ** ${command.type} ${command.arg1} ${command.arg2} **`);
+
+        result.push(`// * push return-address *`);
+        // D←return-address
+        result.push(`@${returnAddress}`);
+        result.push(`D=A`);
+        // M[SP]←D
+        result.push(`@SP`);
+        result.push(`A=M`);
+        result.push(`M=D`);
+        // SP++
+        result.push(`@SP`);
+        result.push(`M=M+1`);
+
+        pushRegister('LCL');
+        pushRegister('ARG');
+        pushRegister('THIS');
+        pushRegister('THAT');
+
+        result.push(`// * ARG = SP – n – 5 *`);
+        // D←SP – n - 5
+        result.push(`@SP`);
+        result.push(`D=M`);
+        result.push(`@${command.arg2 - 5}`);
+        result.push(`D=D-A`);
+        // ARG←D
+        result.push(`@ARG`);
+        result.push(`M=D`);
+
+        result.push(`// * LCL=SP *`);
+        result.push(`@SP`);
+        result.push(`D=M`);
+        result.push(`@LCL`);
+        result.push(`M=D`);
+
+        result.push(`// * goto f *`);
+        result.push(`@${command.arg1}`);
+        result.push(`0;JMP`);
+        result.push(`(${returnAddress})`);
+
+        return result;
+    }
+
+    translateReturn(command) {
+        const result = [];
+
+        result.push(`// ** return **`);
+
+        result.push(`// * FRAME = LCL *`);
+        // R13をFRAMEとする
+        result.push(`@LCL`);
+        result.push(`D=M`);
+        result.push(`@R13`);
+        result.push(`M=D`);
+
+        result.push(`// * RET = *(FRAME – 5) *`);
+        // R14をRETとする
+        result.push(`@5`);
+        result.push(`D=D-A`);
+        result.push(`@R14`);
+        result.push(`M=D`);
+
+        result.push(`// * *ARG = POP() *`);
+        // D←M[SP]
+        result.push(`@SP`);
+        result.push(`A=M`);
+        result.push(`D=M`);
+        // M[ARG]←D
+        result.push(`@ARG`);
+        result.push(`A=M`);
+        result.push(`M=D`);
+
+        result.push(`// * SP = ARG + 1 *`);
+        result.push(`@ARG`);
+        result.push(`D=M+1`);
+        result.push(`@SP`);
+        result.push(`M=D`);
+
+        const restoreRegister = (name, diff) => {
+            result.push(`// * ${name} = *(FRAME - ${diff}) *`);
+            result.push(`@R13`);
+            result.push(`D=M`);
+            result.push(`@${diff}`);
+            result.push(`A=D-A`);
+            result.push(`D=M`);
+            result.push(`@${name}`);
+            result.push(`M=D`);
+        };
+
+        // TODO restoreRegisterを使って以下を実装
+        result.push(`// * THAT = *(FRAME – 1) *`);
+        result.push(`// * THIS = *(FRAME – 2) *`);
+        result.push(`// * ARG = *(FRAME – 3) *`);
+        result.push(`// * LCL = *(FRAME – 4) *`);
+        result.push(`// * goto RET *`);
+        return result;
+    }
+
     pushResults(results) {
         results.forEach(result => {
             this.push(result);
