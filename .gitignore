@@ -2,6 +2,7 @@
 *.out
 *.cmp
 *.hack
+*.tmp
 
 06/*/*.asm
 

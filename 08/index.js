@@ -457,7 +457,16 @@ class Translator extends Transform {
         result.push(`// ** ${command.type} ${command.arg1} ${command.arg2} **`);
         result.push(`(${command.arg1})`);
         for (let i = 0; i < command.arg2; i++) {
-            result.push(`push constant 0`);
+            // D←0
+            result.push(`@0`);
+            result.push(`D=A`);
+            // M[SP]←D
+            result.push(`@SP`);
+            result.push(`A=M`);
+            result.push(`M=D`);
+            // SP++
+            result.push(`@SP`);
+            result.push(`M=M+1`);
         }
         return result;
     }
@@ -539,13 +548,16 @@ class Translator extends Transform {
         result.push(`// * RET = *(FRAME – 5) *`);
         // R14をRETとする
         result.push(`@5`);
-        result.push(`D=D-A`);
+        result.push(`A=D-A`);
+        result.push(`D=M`)
         result.push(`@R14`);
         result.push(`M=D`);
 
         result.push(`// * *ARG = POP() *`);
-        // D←M[SP]
+        // SP=SP-1
         result.push(`@SP`);
+        result.push(`M=M-1`);
+        // D←M[SP]
         result.push(`A=M`);
         result.push(`D=M`);
         // M[ARG]←D
@@ -570,12 +582,20 @@ class Translator extends Transform {
             result.push(`M=D`);
         };
 
-        // TODO restoreRegisterを使って以下を実装
         result.push(`// * THAT = *(FRAME – 1) *`);
+        restoreRegister('THAT', 1);
         result.push(`// * THIS = *(FRAME – 2) *`);
+        restoreRegister('THIS', 2);
         result.push(`// * ARG = *(FRAME – 3) *`);
+        restoreRegister('ARG', 3);
         result.push(`// * LCL = *(FRAME – 4) *`);
+        restoreRegister('LCL', 4);
+
         result.push(`// * goto RET *`);
+        result.push(`@R14`);
+        result.push(`A=M`);
+        result.push(`0;JMP`);
+
         return result;
     }
 
