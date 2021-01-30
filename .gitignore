@@ -3,6 +3,7 @@
 *.cmp
 *.hack
 *.tmp
+node_modules
 
 06/*/*.asm
 

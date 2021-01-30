@@ -1,0 +1,2 @@
+set SP 256
+call Sys.init 0

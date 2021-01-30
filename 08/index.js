@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const { exit } = require('process');
 const { Transform } = require('stream');
+const commander = require('commander');
+const { program } = require('commander');
 
 class LineSplitter extends Transform {
     constructor(options) {
@@ -112,6 +114,12 @@ class Parser extends Transform {
                 result.type = 'RETURN';
                 break;
 
+            case 'set':
+                result.type = 'SET';
+                result.arg1 = words[1];
+                result.arg2 = parseInt(words[2]);
+                break;
+
             default:
                 break;
         }
@@ -165,6 +173,10 @@ class Translator extends Transform {
             this.#segMap2.set('temp', '5');
         }
         return this.#segMap2;
+    }
+
+    newLabel() {
+        return `${this.inFileBaseName}.$LABEL${this.labelNumber++}`;
     }
 
     translatePUSH(command) {
@@ -366,6 +378,8 @@ class Translator extends Transform {
 
     translateComparisonOperation(command) {
         const result = [];
+        const label1 = this.newLabel();
+        const label2 = this.newLabel();
 
         result.push(`// ** ${command.arg1} **`);
         result.push(`// @SP = @SP - 1`);
@@ -385,7 +399,7 @@ class Translator extends Transform {
 
         result.push(`// substract 2 values`);
         result.push(`D=M-D`);
-        result.push(`@COMP${this.labelNumber++}`);
+        result.push(`@${label1}`);
         switch (command.arg1) {
             case 'eq':
                 result.push(`D;JEQ`);
@@ -404,18 +418,18 @@ class Translator extends Transform {
         result.push(`@SP`);
         result.push(`A=M`);
         result.push(`M=0`);
-        result.push(`@COMP${this.labelNumber++}`);
+        result.push(`@${label2}`);
         result.push(`0;JMP`);
 
         result.push(`// case : condition is true`);
-        result.push(`(COMP${this.labelNumber - 2})`);
+        result.push(`(${label1})`);
         result.push(`D=-1`);
         result.push(`@SP`);
         result.push(`A=M`);
         result.push(`M=D`);
 
         result.push(`// @SP++`);
-        result.push(`(COMP${this.labelNumber - 1})`);
+        result.push(`(${label2})`);
         result.push(`@SP`);
         result.push(`M=M+1`);
 
@@ -489,7 +503,7 @@ class Translator extends Transform {
             result.push(`M=M+1`);
         };
 
-        const returnAddress = `$ret.${this.labelNumber++}`;
+        const returnAddress = this.newLabel();
         result.push(`// ** ${command.type} ${command.arg1} ${command.arg2} **`);
 
         result.push(`// * push return-address *`);
@@ -595,6 +609,18 @@ class Translator extends Transform {
         return result;
     }
 
+    translateSet(command) {
+        const result = [];
+
+        result.push(`// ** ${command.type} ${command.arg1} ${command.arg2} **`);
+        result.push(`@${command.arg2}`);
+        result.push('D=A');
+        result.push(`@${command.arg1}`);
+        result.push('M=D');
+    
+        return result;
+    }
+
     pushResults(results) {
         results.forEach(result => {
             this.push(result);
@@ -630,6 +656,9 @@ class Translator extends Transform {
             case 'RETURN':
                 this.pushResults(this.translateReturn(chunk));
                 break;
+            case 'SET':
+                this.pushResults(this.translateSet(chunk));
+                break;
             default:
                 break;
         }
@@ -663,15 +692,23 @@ function asmFileName(inputName) {
     return outputFileName;
 }
 
-function vmFiles(inputName) {
+function vmFiles(inputName, toImportBootstrap) {
+    const files = [];
+    const bootstrapFile = path.join(__dirname, 'Bootstrap.vm');
+
+    if (toImportBootstrap) {
+        files.push(bootstrapFile);
+    }
+
     if (fs.statSync(inputName).isDirectory()) {
-        return fs.readdirSync(inputName, { withFileTypes: true })
+        const vmFiles = fs.readdirSync(inputName, { withFileTypes: true })
             .filter(d => d.isFile() && path.extname(d.name) === '.vm')
             .map(d => d.name)
             .sort()
             .map(f => path.join(inputName, f));
+        return [...files, ...vmFiles];
     } else {
-        return [inputName];
+        return [...files, inputName];
     }
 }
 
@@ -689,7 +726,7 @@ function translateFile(inFileName, outStream) {
             .pipe(new Parser())
             .pipe(new Translator(inFileName))
             .pipe(formatter)
-            .pipe(out, { end: false });
+            .pipe(outStream, { end: false });
     });
 }
 
@@ -702,11 +739,12 @@ async function translateFiles(inFileNames, out) {
 
 function writeWithPromise(out, chunk) {
     return new Promise(resolve => {
-        out.write(chunk+`\r\n`, null, resolve);
+        out.write(chunk + `\r\n`, null, resolve);
     });
 }
 
 async function appendBootstrapCode(out) {
+    return true;
     await writeWithPromise(out, '@256');
     await writeWithPromise(out, 'D=A');
     await writeWithPromise(out, '@SP');
@@ -716,17 +754,19 @@ async function appendBootstrapCode(out) {
     return true;
 }
 
-if (!fs.existsSync(process.argv[2])) {
+program
+    .option('-nb, --no-bootstrap', 'No boot strap code')
+    .parse(process.argv);
+
+if (!fs.existsSync(program.args[0])) {
     console.error('file does not exists.');
     exit(1);
 }
 
-const out = fs.createWriteStream(
-    asmFileName(process.argv[2]));
-const inFiles = vmFiles(process.argv[2]);
+const out = fs.createWriteStream(asmFileName(program.args[0]));
+const inFiles = vmFiles(program.args[0], program.bootstrap);
 
-appendBootstrapCode(out)
-    .then(() => translateFiles(inFiles, out))
+translateFiles(inFiles, out)
     .then(() => {
         out.end();
     }).catch(e => {
